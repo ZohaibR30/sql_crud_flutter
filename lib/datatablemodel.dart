@@ -1,7 +1,8 @@
+import 'package:flutter/cupertino.dart';
+
 import 'employee.dart';
 import 'services.dart';
 import 'package:flutter/material.dart';
-import 'dart:developer';
 
 class DataTableDemo extends StatefulWidget {
   const DataTableDemo({Key? key}) : super(key: key);
@@ -32,6 +33,7 @@ class _DataTableDemoState extends State<DataTableDemo> {
     _scaffoldKey = GlobalKey(); //KEY TO GET THE CONTEXT TO SHOW ON SNACKBAR
     _firstNameController = TextEditingController();
     _lastNameController = TextEditingController();
+    _getEmployee();
   }
 
   //METHOD TO UPDATE TITLE IN THE APPBAR TITLE
@@ -59,17 +61,145 @@ class _DataTableDemoState extends State<DataTableDemo> {
     });
   }
 
-  _addEmployee() {}
+  _addEmployee() {
+    if (_firstNameController.text.isEmpty || _lastNameController.text.isEmpty) {
+      print('Empty Fields');
+      return;
+    }
 
-  _getEmployee() {}
+    _showProgress('Adding Employee...');
+    Services.addEmployee(_firstNameController.text, _lastNameController.text)
+        .then((result) {
+      if ('success' == result) {
+        _getEmployee(); //REFRESH LIST AFTER ADDING EACH VALUE
+        _clearValues();
+      }
+    });
+  }
 
-  _updateEmployee() {}
-  _deleteEmployee() {}
+  _getEmployee() {
+    _showProgress('Loading Employees...');
+    Services.getEmployees().then((employees) {
+      setState(() {
+        _employees = employees;
+      });
+      _showProgress(widget.title); //RESET THE TITLE...
+      print("Length ${employees.length}");
+    });
+  }
+
+  _updateEmployee(Employee employee) {
+    setState(() {
+      _isUpdating = true;
+    });
+
+    _showProgress('Updating Employee...');
+    Services.updateEmployee(
+            employee.id, _firstNameController.text, _lastNameController.text)
+        .then((result) {
+      if ('success' == result) {
+        _getEmployee(); //REFRESH LIST AFTER UPDATE
+        setState(() {
+          _isUpdating = false;
+        });
+        _clearValues();
+      }
+    });
+  }
+
+  _deleteEmployee(Employee employee) {
+    _showProgress('Deleting Employee...');
+    Services.deleteEmployee(employee.id).then((result) {
+      if ('success' == result) {
+        _getEmployee(); //REFRESH LIST AFTER DELETE
+      }
+    });
+  }
 
   //METHOD TO CLEAR TEXTFIELD VALUES
   _clearValues() {
     _firstNameController.text = '';
     _lastNameController.text = '';
+  }
+
+  _showValues(Employee employee) {
+    _firstNameController.text = employee.firstName;
+    _lastNameController.text = employee.lastName;
+  }
+
+  //DATA TABLE TO SHOW EMPLOYEES LIST
+  SingleChildScrollView _dataBody() {
+    return SingleChildScrollView(
+      //SCROLL BOTH VERTICAL AND HORIZONTAL
+      scrollDirection: Axis.vertical,
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: DataTable(
+          columns: [
+            DataColumn(
+              label: Text('ID'),
+            ),
+            DataColumn(
+              label: Text('FIRST NAME'),
+            ),
+            DataColumn(
+              label: Text('LAST NAME'),
+            ),
+            //DATACOLUMN TO DELETE
+            DataColumn(
+              label: Text('DELETE'),
+            ),
+          ],
+          rows: _employees
+              .map(
+                (employee) => DataRow(cells: [
+                  DataCell(Text(employee.id),
+                      //ADD TAP IN ROW TO POPULATE WITH CORRESPONDING VALUES TO UPDATE
+                      onTap: () {
+                    _showValues(employee);
+                    //SET SELECTED EMPLOYEE TO UPDATE
+                    _selectedEmployee = employee;
+
+                    setState(() {
+                      _isUpdating = true;
+                    });
+                  }),
+                  DataCell(
+                      Text(
+                        employee.firstName.toUpperCase(),
+                      ), onTap: () {
+                    _showValues(employee);
+                    //SET SELECTED EMPLOYEE TO UPDATE
+                    _selectedEmployee = employee;
+
+                    setState(() {
+                      _isUpdating = true;
+                    });
+                  }),
+                  DataCell(
+                      Text(
+                        employee.lastName.toUpperCase(),
+                      ), onTap: () {
+                    _showValues(employee);
+                    //SET SELECTED EMPLOYEE TO UPDATE
+                    _selectedEmployee = employee;
+
+                    setState(() {
+                      _isUpdating = true;
+                    });
+                  }),
+                  DataCell(IconButton(
+                    icon: Icon(Icons.delete),
+                    onPressed: () {
+                      _deleteEmployee(employee);
+                    },
+                  ))
+                ]),
+              )
+              .toList(),
+        ),
+      ),
+    );
   }
 
   //UI
@@ -95,52 +225,62 @@ class _DataTableDemoState extends State<DataTableDemo> {
         ],
       ),
       body: Container(
-          child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: <Widget>[
-          Padding(
-            padding: EdgeInsets.all(20.0),
-            child: TextField(
-              controller: _firstNameController,
-              decoration: InputDecoration.collapsed(
-                hintText: 'First Name',
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: <Widget>[
+            Padding(
+              padding: EdgeInsets.all(20.0),
+              child: TextField(
+                controller: _firstNameController,
+                decoration: InputDecoration.collapsed(
+                  hintText: 'First Name',
+                ),
               ),
             ),
-          ),
-          Padding(
-            padding: EdgeInsets.all(20.0),
-            child: TextField(
-              controller: _lastNameController,
-              decoration: InputDecoration.collapsed(
-                hintText: 'Last Name',
+            Padding(
+              padding: EdgeInsets.all(20.0),
+              child: TextField(
+                controller: _lastNameController,
+                decoration: InputDecoration.collapsed(
+                  hintText: 'Last Name',
+                ),
               ),
             ),
-          ),
-          //ADD UPDATE AND CANCEL BUTTON
-          //SHOW BUTTONS ONLY WHEN UPDATING
-          _isUpdating
-              ? Row(
-                  children: <Widget>[
-                    OutlinedButton(
-                      child: Text('UPDATE'),
-                      onPressed: () {
-                        _updateEmployee();
-                      },
-                    ),
-                    OutlinedButton(
-                      child: Text('CANCEL'),
-                      onPressed: () {
-                        setState(() {
-                          _isUpdating = false;
-                        });
-                        _clearValues();
-                      },
-                    ),
-                  ],
-                )
-              : Container(),
-        ],
-      )),
+            //ADD UPDATE AND CANCEL BUTTON
+            //SHOW BUTTONS ONLY WHEN UPDATING
+            _isUpdating
+                ? Row(
+                    children: <Widget>[
+                      OutlinedButton(
+                        child: Text('UPDATE'),
+                        onPressed: () {
+                          _updateEmployee(_selectedEmployee);
+                        },
+                      ),
+                      OutlinedButton(
+                        child: Text('CANCEL'),
+                        onPressed: () {
+                          setState(() {
+                            _isUpdating = false;
+                          });
+                          _clearValues();
+                        },
+                      ),
+                    ],
+                  )
+                : Container(),
+            Expanded(
+              child: _dataBody(),
+            ),
+          ],
+        ),
+      ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () {
+          _addEmployee();
+        },
+        child: Icon(Icons.add),
+      ),
     );
   }
 }
